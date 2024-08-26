@@ -1,5 +1,11 @@
+/* eslint-disable prettier/prettier */
 import {Suspense} from 'react';
-import {defer, redirect, type LoaderFunctionArgs} from '@shopify/remix-oxygen';
+import {
+  defer,
+  json,
+  redirect,
+  type LoaderFunctionArgs,
+} from '@shopify/remix-oxygen';
 import {Await, useLoaderData, type MetaFunction} from '@remix-run/react';
 import type {ProductFragment} from 'storefrontapi.generated';
 import {
@@ -13,8 +19,12 @@ import {ProductPrice} from '~/components/ProductPrice';
 import {ProductImage} from '~/components/ProductImage';
 import {ProductForm} from '~/components/ProductForm';
 
+import {PortableText} from '@portabletext/react';
+import type {SanityDocument} from '@sanity/client';
+import {groq} from 'hydrogen-sanity/groq';
+
 export const meta: MetaFunction<typeof loader> = ({data}) => {
-  return [{title: `Hydrogen | ${data?.product.title ?? ''}`}];
+  return [{title: `Hydrogen | ${data?.product?.title ?? ''}`}];
 };
 
 export async function loader(args: LoaderFunctionArgs) {
@@ -37,7 +47,7 @@ async function loadCriticalData({
   request,
 }: LoaderFunctionArgs) {
   const {handle} = params;
-  const {storefront} = context;
+  const {storefront, sanity} = context;
 
   if (!handle) {
     throw new Error('Expected product handle to be defined');
@@ -71,6 +81,14 @@ async function loadCriticalData({
       throw redirectToFirstVariant({product, request});
     }
   }
+
+  const query = groq`*[_type == "product" && store.slug.current == $handle][0]{
+    body,
+    "image": store.previewImageUrl
+}`;
+  const initial = await sanity.loadQuery<SanityDocument>(query, params);
+  // console.log(json({product, initial}));
+  // return json({product, initial});
 
   return {
     product,
@@ -181,7 +199,7 @@ export default function Product() {
           products: [
             {
               id: product.id,
-              title: product.title,
+              title: product?.title,
               price: selectedVariant?.price.amount || '0',
               vendor: product.vendor,
               variantId: selectedVariant?.id || '',

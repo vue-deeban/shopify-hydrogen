@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import type {EntryContext, AppLoadContext} from '@shopify/remix-oxygen';
 import {RemixServer} from '@remix-run/react';
 import isbot from 'isbot';
@@ -11,11 +12,24 @@ export default async function handleRequest(
   remixContext: EntryContext,
   context: AppLoadContext,
 ) {
+  const projectId = context.env.SANITY_PROJECT_ID;
   const {nonce, header, NonceProvider} = createContentSecurityPolicy({
     shop: {
       checkoutDomain: context.env.PUBLIC_CHECKOUT_DOMAIN,
       storeDomain: context.env.PUBLIC_STORE_DOMAIN,
     },
+    // Include Sanity domains in the CSP
+    defaultSrc: ['https://cdn.sanity.io', 'https://lh3.googleusercontent.com'],
+    connectSrc: [
+      `https://${projectId}.api.sanity.io`,
+      `wss://${projectId}.api.sanity.io`,
+    ],
+    // Consider using an environment variable here
+    frameAncestors: [
+      `http://localhost:3333`,
+      `'self'`,
+      `http://localhost:3000`,
+    ],
   });
 
   const body = await renderToReadableStream(
@@ -26,7 +40,6 @@ export default async function handleRequest(
       nonce,
       signal: request.signal,
       onError(error) {
-        // eslint-disable-next-line no-console
         console.error(error);
         responseStatusCode = 500;
       },

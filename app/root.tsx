@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import {useNonce, getShopAnalytics, Analytics} from '@shopify/hydrogen';
 import {defer, type LoaderFunctionArgs} from '@shopify/remix-oxygen';
 import {
@@ -10,12 +11,15 @@ import {
   ScrollRestoration,
   isRouteErrorResponse,
   type ShouldRevalidateFunction,
+  useLoaderData,
 } from '@remix-run/react';
 import favicon from '~/assets/favicon.svg';
 import resetStyles from '~/styles/reset.css?url';
 import appStyles from '~/styles/app.css?url';
 import {PageLayout} from '~/components/PageLayout';
 import {FOOTER_QUERY, HEADER_QUERY} from '~/lib/fragments';
+
+import {VisualEditing} from 'hydrogen-sanity/visual-editing';
 
 export type RootLoader = typeof loader;
 
@@ -60,7 +64,7 @@ export async function loader(args: LoaderFunctionArgs) {
   // Await the critical data required to render initial state of the page
   const criticalData = await loadCriticalData(args);
 
-  const {storefront, env} = args.context;
+  const {storefront, env, sanity} = args.context;
 
   return defer({
     ...deferredData,
@@ -74,6 +78,7 @@ export async function loader(args: LoaderFunctionArgs) {
       checkoutDomain: env.PUBLIC_CHECKOUT_DOMAIN,
       storefrontAccessToken: env.PUBLIC_STOREFRONT_API_TOKEN,
     },
+    preview: sanity.preview?.enabled,
   });
 }
 
@@ -159,7 +164,14 @@ export function Layout({children}: {children?: React.ReactNode}) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const {preview} = useLoaderData<typeof loader>();
+
+  return (
+    <>
+      <Outlet />
+      {preview ? <VisualEditing /> : null}
+    </>
+  );
 }
 
 export function ErrorBoundary() {

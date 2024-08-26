@@ -1,6 +1,8 @@
-import {createHydrogenContext} from '@shopify/hydrogen';
+/* eslint-disable prettier/prettier */
+import {createHydrogenContext, createWithCache} from '@shopify/hydrogen';
 import {AppSession} from '~/lib/session';
 import {CART_QUERY_FRAGMENT} from '~/lib/fragments';
+import {createSanityLoader} from 'hydrogen-sanity';
 
 /**
  * The context implementation is separate from server.ts
@@ -24,6 +26,34 @@ export async function createAppLoadContext(
     AppSession.init(request, [env.SESSION_SECRET]),
   ]);
 
+  const withCache = createWithCache({
+    cache,
+    waitUntil,
+    request,
+  });
+
+  const sanity = createSanityLoader({
+    // Required:
+    withCache,
+
+    // Required:
+    // Pass configuration options for Sanity client or an instantialized client
+    client: {
+      projectId: env.SANITY_PROJECT_ID,
+      dataset: env.SANITY_DATASET,
+      apiVersion: env.SANITY_API_VERSION || '2023-06-27',
+      useCdn: process.env.NODE_ENV === 'production',
+    },
+    preview: env.SANITY_API_TOKEN
+      ? {
+          // ...and the condition for when to enable it
+          enabled: true,
+          token: env.SANITY_API_TOKEN,
+          studioUrl: 'http://localhost:3333',
+        }
+      : undefined,
+  });
+
   const hydrogenContext = createHydrogenContext({
     env,
     request,
@@ -38,6 +68,7 @@ export async function createAppLoadContext(
 
   return {
     ...hydrogenContext,
+    sanity,
     // declare additional Remix loader context
   };
 }

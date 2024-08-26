@@ -1,4 +1,5 @@
-import {defer, type LoaderFunctionArgs} from '@shopify/remix-oxygen';
+/* eslint-disable prettier/prettier */
+import {defer, json, type LoaderFunctionArgs} from '@shopify/remix-oxygen';
 import {Await, useLoaderData, Link, type MetaFunction} from '@remix-run/react';
 import {Suspense} from 'react';
 import {Image, Money} from '@shopify/hydrogen';
@@ -6,6 +7,10 @@ import type {
   FeaturedCollectionFragment,
   RecommendedProductsQuery,
 } from 'storefrontapi.generated';
+
+import {PortableText} from '@portabletext/react';
+import type {SanityDocument} from '@sanity/client';
+import {groq} from 'hydrogen-sanity/groq';
 
 export const meta: MetaFunction = () => {
   return [{title: 'Hydrogen | Home'}];
@@ -17,8 +22,16 @@ export async function loader(args: LoaderFunctionArgs) {
 
   // Await the critical data required to render initial state of the page
   const criticalData = await loadCriticalData(args);
-
-  return defer({...deferredData, ...criticalData});
+  const query = groq`*[_type == "product"][0]{
+    body,
+    "image": store.previewImageUrl
+}`;
+  const initial = await args.context.sanity.loadQuery<SanityDocument>(
+    query,
+    {},
+  );
+  console.log(initial);
+  return json({initial});
 }
 
 /**
@@ -41,8 +54,8 @@ async function loadCriticalData({context}: LoaderFunctionArgs) {
  * fetched after the initial page load. If it's unavailable, the page should still 200.
  * Make sure to not throw any errors here, as it will cause the page to 500.
  */
-function loadDeferredData({context}: LoaderFunctionArgs) {
-  const recommendedProducts = context.storefront
+async function loadDeferredData({context}: LoaderFunctionArgs) {
+  const {recommendedProducts} = context.storefront
     .query(RECOMMENDED_PRODUCTS_QUERY)
     .catch((error) => {
       // Log query errors, but don't throw them so the page can still render
@@ -50,17 +63,25 @@ function loadDeferredData({context}: LoaderFunctionArgs) {
       return null;
     });
 
-  return {
-    recommendedProducts,
-  };
+  const query = groq`*[_type == "product"][0]{
+      body,
+      "image": store.previewImageUrl
+      "price": store.price
+  }`;
+  const initial = await context.sanity.loadQuery<SanityDocument>(query, {});
+  console.log(initial);
+  return {recommendedProducts, initial};
 }
 
 export default function Homepage() {
-  const data = useLoaderData<typeof loader>();
+  const {initial} = useLoaderData<typeof loader>();
+  console.log(initial);
   return (
     <div className="home">
-      <FeaturedCollection collection={data.featuredCollection} />
-      <RecommendedProducts products={data.recommendedProducts} />
+      <img src={initial.data.image} width="300px" />
+      <p>{initial.data.body[0].children[0].text}</p>
+      {/* <FeaturedCollection collection={featuredCollection} /> */}
+      {/* <RecommendedProducts products={data.recommendedProducts} /> */}
     </div>
   );
 }
